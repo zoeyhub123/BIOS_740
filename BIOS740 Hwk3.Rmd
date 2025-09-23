@@ -1,0 +1,43 @@
+---
+title: "BIOS740 HWK3"
+output: html_document
+date: "2025-09-18"
+---
+
+```{r}
+# TSA: 
+# Question 2.3
+```
+
+```{r}
+install.packages("astsa")
+library(ggplot2)
+library("astsa")
+```
+
+
+```{r}
+par(mfrow=c(3,2))
+for (i in 1:6){
+  x <- cumsum(rnorm(100, mean=.1, sd=1)) 
+  reg_x <- lm(x~0 + time(x), na.action=NULL) # regression
+  tsplot(x, main = paste("Random Walk with Drift", i), ylab = "Value", xlab = "Time")
+  abline(a=0, b=.1, col=2, lty=5) # true mean(red-dashed)
+  abline(reg_x, col=4) # fitted line(blue-solid)
+}
+```
+
+```{r}
+par(mfrow = c(3, 2))
+for (i in 1:6) {
+  # The true mean function is μt = 0.1t.
+  y <- 0.1 * 1:100 + rnorm(100, mean = 0, sd=1)
+  # The formula 'y ~ 0 + time(y)' fits the model yt = βt + wt,
+  # where '0' removes the intercept, and 'time(y)' creates the sequence 1, 2, ..., 100.
+  reg_y <- lm(y ~ 0 + time(y), na.action = NULL)
+  tsplot(y, main = paste("Linear Trend + Noise", i), ylab = "Value", xlab = "Time")
+  abline(a=0, b=.1, col=2, lty=5) # Add the true mean function to the plot.
+  abline(reg_y, col=4) # fitted line(blue-solid)
+}
+
+```
