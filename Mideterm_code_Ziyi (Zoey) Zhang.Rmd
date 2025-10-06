@@ -1,0 +1,244 @@
+---
+title: "Mideterm"
+output: html_document
+date: "2025-10-01"
+---
+
+```{r Alert}
+# some code from the textbook is suitable for Matlab and needs to be further changed for R using
+```
+
+
+```{R Code example from example 2.2 and example 3.17}
+# Example 2.2
+par(mfrow = c(3,1))
+tsplot(cmort, ylab="Rate per 10,000", type="o", pch=19, col=6, nxm=2,
+main="Cardiovascular Mortality")
+tsplot(tempr, ylab="\u00B0F", type="o", pch=19, col=4, nxm=2,
+main="Temperature")
+tsplot(part, ylab="PPM", type="o", pch=19, col=2, nxm=2, main="Particulates")
+dev.new()
+pairs(cbind(Mortality=cmort, Temperature=tempr, Particulates=part), col=4,
+lower.panel = astsa:::.panelcor)
+temp = tempr - mean(tempr) #center temperature
+temp2 = tempˆ2
+trend = time(cmort) #time
+fit = lm(cmort˜ trend + temp + temp2 + part, na.action=NULL)
+summary(fit) #regression results
+summary(aov(fit)) #ANOVA table(compare to next line)
+summary(aov(lm(cmort˜cbind(trend, temp, temp2, part)))) #Table2.1
+num = length(cmort) #sample size
+AIC(fit)/num - log(2*pi) #AIC asin (2.15)
+BIC(fit)/num - log(2*pi) #BIC asin (2.17)
+(AICc = log(sum(resid(fit)ˆ2)/num) + (num+5)/(num-5-2)) #AICc
+
+# Example 3.17
+acf2(rec, 48) #will produce values and a graphic
+(regr = ar.ols(rec, order=2, demean=FALSE, intercept=TRUE))
+regr$asy.se.coef #standard errors of the estimates
+```
+
+
+```{r packages install and dataset checking}
+install.packages("astsa")
+install.packages("forecast")
+library(astsa)
+library(forecast)
+
+data(cmort)
+head(cmort)
+```
+
+```{r Question 3.10}
+# Part (a)
+# 1. Check ACF/PACF as a preliminary diagnostic for AR(2) model selection
+acf2(cmort, 48)
+
+# 2. Fitting an AR(2) model using the OLS method
+# order=2
+cat("\n--- AR(2) model fitting results ---\n")
+regr <- ar.ols(cmort, order=2, demean=FALSE, intercept=TRUE)
+print(regr)
+regr$asy.se.coef
+
+# 3. Extract residual
+resid_regr <- residuals(regr)
+
+# check ACF/PACF of residual to test white noise
+acf2(resid_regr, 48)
+
+# Part (b)
+# 1. return the standard error
+prediction_result <- predict(regr, n.ahead = 4, se. = TRUE)
+print(prediction_result)
+
+# 2. Extract predicted point values and standard errors
+forecasts <- prediction_result$pred
+std_errors <- prediction_result$se
+
+# 3. Define 95% critical value (use qnorm to find Z score), n=508 is large enough to assume a normal distribution
+critical_value <- qnorm(0.975) 
+
+# 4. Calculate the lower and upper bounds of the 95% CI
+lower_bound <- forecasts - critical_value * std_errors
+upper_bound <- forecasts + critical_value * std_errors
+
+# 5. results
+results_table <- data.frame(
+  Horizon = 1:4,
+  Forecast = forecasts,
+  Lower_95 = lower_bound,
+  Upper_95 = upper_bound
+)
+
+cat("\n--- 4-Week Forecasts with 95% Prediction Intervals ---\n")
+print(results_table)
+
+```
+
+
+
+```{R Code example from example 3.27 and 3.30}
+
+# example 3.27
+rec.yw = ar.yw(rec, order=2)
+rec.yw$x.mean #=62.26(mean estimate)
+rec.yw$ar #=1.33, -.44 (coefficient estimates)
+sqrt(diag(rec.yw$asy.var.coef)) #=.04, .04 (standard errors)
+rec.yw$var.pred #=94.80(error variance estimate)
+
+#To obtain the 24-month ahead predictions and their standard errors, and then plot
+#the results (not shown) as in Example 3.23, use the following:
+rec.pr = predict(rec.yw, n.ahead=24)
+tsplot(cbind(rec, rec.pr$pred), col=1:2, spaghetti=TRUE)
+lines(rec.pr$pred + rec.pr$se, col=2, lty=5)
+lines(rec.pr$pred - rec.pr$se, col=2, lty=5)
+
+# example 3.30
+rec.mle = ar.mle(rec, order=2)
+rec.mle$x.mean #62.26
+rec.mle$ar #1.35, -.46
+sqrt(diag(rec.mle$asy.var.coef)) #.04, .04
+rec.mle$var.pred #89.34
+```
+
+
+```{r # Question 3.17}
+# a)
+regols<- ar.ols(cmort, order=2) # linear regression
+
+regols$x.mean  # (mean estimate)
+phi_ols <- regols$ar # (coefficient estimates)
+sigma2_ols <- regols$var.pred # (variance estimate)
+se_ols <- regols$asy.se.coef # (standard errors)
+
+cat(sprintf("AR coefficients (phi1, phi2): %.4f, %.4f\n", phi_ols[1], phi_ols[2]))
+cat(sprintf("Residual variance (sigma^2): %.4f\n", sigma2_ols))
+cat("Standard error (se_phi1, se_phi2):\n")
+print(se_ols)
+
+
+regyk<- ar.yw(cmort, order=2) # Yule–Walker
+
+regyk$x.mean  # (mean estimate)
+phi_yw <- regyk$ar
+sigma2_yw <- regyk$var.pred
+se_yw <- sqrt(diag(regyk$asy.var.coef))
+
+cat(sprintf("AR coefficients (phi1, phi2): %.4f, %.4f\n", phi_yw[1], phi_yw[2]))
+cat(sprintf("Residual variance (sigma^2): %.4f\n", sigma2_yw))
+cat("Standard error (se_phi1, se_phi2):\n")
+print(se_yw)
+
+comparison <- data.frame(
+  Method = c("OLS (linear)", "Yule-Walker"),
+  phi_1 = c(phi_ols[1], phi_yw[1]), 
+  phi_2 = c(phi_ols[2], phi_yw[2]), 
+  Sigma2 = c(sigma2_ols, sigma2_yw), 
+  SE_phi1 = c(se_ols$ar[1], 
+              # Yule-Walker uses simple indexing [1]
+              se_yw[1]), 
+              
+  SE_phi2 = c(se_ols$ar[2], 
+              # Yule-Walker uses simple indexing [2]
+              se_yw[2]) 
+)
+
+print(t(comparison))
+```
+
+```{r MLE Question 3}
+regmle = ar.mle(cmort, order=2)
+regmle$x.mean
+regmle$ar 
+sqrt(diag(regmle$asy.var.coef)) 
+regmle$var.pred 
+```
+
+```{r Question 4}
+# (a)
+n <- 128
+t <- 1:n
+
+# x_t1: Frequency f = 0.06
+x_t1 <- 2 * cos(2 * pi * 0.06 * t) + 3 * sin(2 * pi * 0.06 * t)
+# x_t2: Frequency f = 0.10
+x_t2 <- 4 * cos(2 * pi * 0.10 * t) + 5 * sin(2 * pi * 0.10 * t)
+# x_t3: Frequency f = 0.40
+x_t3 <- 6 * cos(2 * pi * 0.40 * t) + 7 * sin(2 * pi * 0.40 * t)
+
+# Create the final series x_t (No noise)
+x_t <- x_t1 + x_t2 + x_t3
+
+# Plot the generated series
+par(mfrow=c(2,2))
+plot.ts(x_t1, type='l', main="freq=0.06",xlab="Time (t)", ylab="x_t")
+plot.ts(x_t2, type='l', main="freq=0.1",xlab="Time (t)", ylab="x_t")
+plot.ts(x_t3, type='l', main="freq=0.4",xlab="Time (t)", ylab="x_t")
+plot.ts(x_t, type='l', main = "Series x_t (n=128)", xlab="Time (t)", ylab="x_t")
+
+
+# (b) 
+P_128 <- abs(2 * fft(x_t) / 128)^2
+
+# Define the frequency vector
+# f = j/n， 0~ 0.5 (64/128)
+f <- 0:64 / 128
+
+plot(f, P_128[1:65], type="o", 
+     xlab="Frequency (f)", 
+     ylab="Periodogram P(f)", 
+     main="Periodogram of Pure Signal (n=128)")
+
+
+# (c) n=100 and add noise
+# 1. Set n=100 and time index
+n_new <- 100 
+t_new <- 1:n_new
+
+# 2. Simulate the signal components
+x_t1_new <- 2 * cos(2 * pi * 0.06 * t_new) + 3 * sin(2 * pi * 0.06 * t_new)
+x_t2_new <- 4 * cos(2 * pi * 0.10 * t_new) + 5 * sin(2 * pi * 0.10 * t_new)
+x_t3_new <- 6 * cos(2 * pi * 0.40 * t_new) + 7 * sin(2 * pi * 0.40 * t_new)
+
+# 3. Generate Noise: w_t ~ N(0, 25) 
+sigma_w <- sqrt(25) 
+w_t <- rnorm(n_new, mean = 0, sd = sigma_w) 
+
+# 4. Create the final noisy series x_t_noisy
+x_t_noisy <- x_t1_new + x_t2_new + x_t3_new + w_t
+
+# 5. plot
+tsplot(x_t_noisy, main = "Series x_t with Noise (n=100)")
+
+# 6. Calculate the Periodogram P (n=100), Define frequency vector (f = 0 to 0.5)
+P_noisy <- abs(2 * fft(x_t_noisy) / 100)^2
+f_noisy <- 0:(50) / 100
+
+# 7. Plot the Periodogram with noise added
+plot(f_noisy, P_noisy[1:51], type="o", 
+     xlab="Frequency (f)", 
+     ylab="Periodogram P(f)", 
+     main="Periodogram of Signal with noise (n=100)")
+```
+
